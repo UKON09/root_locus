@@ -17,6 +17,37 @@ function [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys)
 n = length(sys_poles);  % 极点数
 m = length(sys_zeros);  % 零点数
 
+% 计算并输出零极点与实轴的夹角
+fprintf('\n=== 零极点与实轴夹角 ===\n');
+
+% 计算极点与实轴夹角
+fprintf('极点与实轴夹角：\n');
+for i = 1:length(sys_poles)
+    pole = sys_poles(i);
+    pole_angle = angle(pole) * 180 / pi;  % 转换为度数
+    if imag(pole) == 0
+        fprintf('极点 %d: %.4f (实数极点，夹角 = 0°)\n', i, real(pole));
+    else
+        fprintf('极点 %d: %.4f%+.4fj，夹角 = %.1f°\n', i, real(pole), imag(pole), pole_angle);
+    end
+end
+
+% 计算零点与实轴夹角（如果存在零点）
+if ~isempty(sys_zeros)
+    fprintf('\n零点与实轴夹角：\n');
+    for i = 1:length(sys_zeros)
+        zero = sys_zeros(i);
+        zero_angle = angle(zero) * 180 / pi;  % 转换为度数
+        if imag(zero) == 0
+            fprintf('零点 %d: %.4f (实数零点，夹角 = 0°)\n', i, real(zero));
+        else
+            fprintf('零点 %d: %.4f%+.4fj，夹角 = %.1f°\n', i, real(zero), imag(zero), zero_angle);
+        end
+    end
+else
+    fprintf('\n系统无零点\n');
+end
+
 % 创建新图形窗口
 figure;
 
