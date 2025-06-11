@@ -1,6 +1,6 @@
 function [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys)
 % PLOTROOTLOCUS 绘制系统根轨迹图
-%   [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys, findCritical)
+%   [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys)
 %
 % 输入参数：
 %   sys          - 开环传递函数 (tf 或 zpk 对象)
@@ -13,7 +13,7 @@ function [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys)
 %   angles     - 出射角和入射角信息结构体
 
 % 获取零极点
-[sys_zeros, sys_poles, ~] = zpkdata(sys, 'v');  % 重命名变量避免与内置函数冲突
+[sys_zeros, sys_poles, ~] = zpkdata(sys, 'v');
 n = length(sys_poles);  % 极点数
 m = length(sys_zeros);  % 零点数
 
@@ -46,6 +46,97 @@ if ~isempty(sys_zeros)
     end
 else
     fprintf('\n系统无零点\n');
+end
+
+%% 计算复数零极点与其他点的夹角
+fprintf('\n=== 复数零极点与其他点的夹角分析 ===\n');
+
+% 分析复数极点与其他点的夹角
+complex_poles_idx = find(imag(sys_poles) ~= 0);
+if ~isempty(complex_poles_idx)
+    fprintf('复数极点与其他点的夹角：\n');
+    for i = 1:length(complex_poles_idx)
+        idx = complex_poles_idx(i);
+        pole = sys_poles(idx);
+        fprintf('\n极点 %d (%.4f%+.4fj) 的角度分析：\n', idx, real(pole), imag(pole));
+        
+        % 与其他极点的夹角
+        fprintf('  与其他极点的夹角：\n');
+        for j = 1:length(sys_poles)
+            if j ~= idx
+                other_pole = sys_poles(j);
+                angle_diff = angle(pole - other_pole) * 180 / pi;
+                distance = abs(pole - other_pole);
+                if imag(other_pole) == 0
+                    fprintf('    到极点 %d (%.4f): 角度 = %.1f°, 距离 = %.4f\n', ...
+                            j, real(other_pole), angle_diff, distance);
+                else
+                    fprintf('    到极点 %d (%.4f%+.4fj): 角度 = %.1f°, 距离 = %.4f\n', ...
+                            j, real(other_pole), imag(other_pole), angle_diff, distance);
+                end
+            end
+        end
+        
+        % 与零点的夹角（如果存在）
+        if ~isempty(sys_zeros)
+            fprintf('  与零点的夹角：\n');
+            for j = 1:length(sys_zeros)
+                zero = sys_zeros(j);
+                angle_diff = angle(pole - zero) * 180 / pi;
+                distance = abs(pole - zero);
+                if imag(zero) == 0
+                    fprintf('    到零点 %d (%.4f): 角度 = %.1f°, 距离 = %.4f\n', ...
+                            j, real(zero), angle_diff, distance);
+                else
+                    fprintf('    到零点 %d (%.4f%+.4fj): 角度 = %.1f°, 距离 = %.4f\n', ...
+                            j, real(zero), imag(zero), angle_diff, distance);
+                end
+            end
+        end
+    end
+end
+
+% 分析复数零点与其他点的夹角
+complex_zeros_idx = find(imag(sys_zeros) ~= 0);
+if ~isempty(complex_zeros_idx)
+    fprintf('\n复数零点与其他点的夹角：\n');
+    for i = 1:length(complex_zeros_idx)
+        idx = complex_zeros_idx(i);
+        zero = sys_zeros(idx);
+        fprintf('\n零点 %d (%.4f%+.4fj) 的角度分析：\n', idx, real(zero), imag(zero));
+        
+        % 与极点的夹角
+        fprintf('  与极点的夹角：\n');
+        for j = 1:length(sys_poles)
+            pole = sys_poles(j);
+            angle_diff = angle(zero - pole) * 180 / pi;
+            distance = abs(zero - pole);
+            if imag(pole) == 0
+                fprintf('    到极点 %d (%.4f): 角度 = %.1f°, 距离 = %.4f\n', ...
+                        j, real(pole), angle_diff, distance);
+            else
+                fprintf('    到极点 %d (%.4f%+.4fj): 角度 = %.1f°, 距离 = %.4f\n', ...
+                        j, real(pole), imag(pole), angle_diff, distance);
+            end
+        end
+        
+        % 与其他零点的夹角
+        fprintf('  与其他零点的夹角：\n');
+        for j = 1:length(sys_zeros)
+            if j ~= idx
+                other_zero = sys_zeros(j);
+                angle_diff = angle(zero - other_zero) * 180 / pi;
+                distance = abs(zero - other_zero);
+                if imag(other_zero) == 0
+                    fprintf('    到零点 %d (%.4f): 角度 = %.1f°, 距离 = %.4f\n', ...
+                            j, real(other_zero), angle_diff, distance);
+                else
+                    fprintf('    到零点 %d (%.4f%+.4fj): 角度 = %.1f°, 距离 = %.4f\n', ...
+                            j, real(other_zero), imag(other_zero), angle_diff, distance);
+                end
+            end
+        end
+    end
 end
 
 % 创建新图形窗口
@@ -119,7 +210,176 @@ if isempty(k_critical)
     fprintf('系统在正增益下无虚轴交点\n');
 end
 
-%% 2. 绘制渐近线
+%% 2. 计算分离点
+fprintf('\n=== 分离点计算 ===\n');
+separation_points = [];
+separation_gains = [];
+
+% 方法1：使用特征方程的导数
+% 分离点条件：dK/ds = 0，即 d/ds[1 + K*G(s)] = 0
+% 这等价于：G'(s) + K*G'(s)*G(s) = 0
+% 即：dG(s)/ds = 0 或者 G(s) = -1/K (这是根轨迹条件)
+
+[num, den] = tfdata(sys, 'v');
+
+% 计算 G(s) = num(s)/den(s) 的导数
+% G'(s) = [num'(s)*den(s) - num(s)*den'(s)] / [den(s)]^2
+
+% 计算多项式的导数
+num_deriv = polyder(num);
+den_deriv = polyder(den);
+
+% 计算分子：num'(s)*den(s) - num(s)*den'(s)
+% 使用conv进行多项式乘法
+if ~isempty(num_deriv) && ~isempty(den)
+    term1 = conv(num_deriv, den);
+else
+    term1 = 0;
+end
+
+if ~isempty(num) && ~isempty(den_deriv)
+    term2 = conv(num, den_deriv);
+else
+    term2 = 0;
+end
+
+% 确保两个多项式长度相同以便相减
+max_len = max(length(term1), length(term2));
+if length(term1) < max_len
+    term1 = [zeros(1, max_len - length(term1)), term1];
+end
+if length(term2) < max_len
+    term2 = [zeros(1, max_len - length(term2)), term2];
+end
+
+numerator_deriv = term1 - term2;
+
+% 分离点条件：numerator_deriv = 0
+% 求解多项式方程的根
+if length(numerator_deriv) > 1
+    separation_candidates = roots(numerator_deriv);
+    
+    % 只保留实数解
+    real_candidates = separation_candidates(abs(imag(separation_candidates)) < 1e-10);
+    real_candidates = real(real_candidates);
+    
+    if ~isempty(real_candidates)
+        fprintf('分离点候选点：\n');
+        
+        for i = 1:length(real_candidates)
+            s_point = real_candidates(i);
+            
+            % 计算该点处的增益值
+            G_value = polyval(num, s_point) / polyval(den, s_point);
+            K_value = -1 / G_value;
+            
+            % 检查增益是否为正实数
+            if isreal(K_value) && K_value > 0 && isfinite(K_value)
+                separation_points = [separation_points, s_point];
+                separation_gains = [separation_gains, K_value];
+                
+                fprintf('  s = %.4f, K = %.4f\n', s_point, K_value);
+                
+                % 在图上标记分离点
+                plot(s_point, 0, 'bs', 'MarkerSize', 12, 'MarkerFaceColor', 'blue', 'LineWidth', 2);
+                text(s_point, 0.3, sprintf('分离点\nK=%.2f', K_value), ...
+                     'FontSize', 9, 'Color', 'blue', 'FontWeight', 'bold', ...
+                     'HorizontalAlignment', 'center');
+            end
+        end
+        
+        if isempty(separation_points)
+            fprintf('候选点中无有效分离点（要求K>0且为实数）\n');
+        end
+    else
+        fprintf('无实数分离点\n');
+    end
+else
+    fprintf('无法计算分离点（系统阶数过低）\n');
+end
+
+% 方法2：验证分离点（可选）
+if ~isempty(separation_points)
+    fprintf('\n分离点验证：\n');
+    for i = 1:length(separation_points)
+        s_point = separation_points(i);
+        K_value = separation_gains(i);
+        
+        % 在分离点处，特征方程应该有重根
+        % 计算特征方程：den(s) + K*num(s) = 0
+        char_poly = den + K_value * num;
+        char_roots = roots(char_poly);
+        
+        % 检查是否有重根（在分离点附近）
+        distances = abs(char_roots - s_point);
+        close_roots = char_roots(distances < 0.1);
+        
+        fprintf('  分离点 s=%.4f 处的特征根：', s_point);
+        for j = 1:length(close_roots)
+            if abs(imag(close_roots(j))) < 1e-10
+                fprintf(' %.4f', real(close_roots(j)));
+            else
+                fprintf(' %.4f%+.4fj', real(close_roots(j)), imag(close_roots(j)));
+            end
+        end
+        fprintf('\n');
+    end
+end
+
+% 方法3：使用根轨迹实轴规则验证
+fprintf('\n实轴上根轨迹区段分析：\n');
+all_critical_points = [real(sys_poles)', real(sys_zeros)'];
+all_critical_points = sort(all_critical_points);
+
+if length(all_critical_points) > 1
+    fprintf('实轴上的关键点：');
+    fprintf(' %.4f', all_critical_points);
+    fprintf('\n');
+    
+    % 检查每个区间
+    for i = 1:length(all_critical_points)-1
+        test_point = (all_critical_points(i) + all_critical_points(i+1)) / 2;
+        
+        % 计算该点右侧的极点和零点数量
+        poles_right = sum(real(sys_poles) > test_point);
+        zeros_right = sum(real(sys_zeros) > test_point);
+        
+        % 根轨迹存在条件：右侧极点数-零点数为奇数
+        if mod(poles_right - zeros_right, 2) == 1
+            fprintf('区间 [%.4f, %.4f] 上有根轨迹\n', all_critical_points(i), all_critical_points(i+1));
+            
+            % 检查该区间内是否有分离点
+            interval_sep_points = separation_points(separation_points > all_critical_points(i) & ...
+                                                   separation_points < all_critical_points(i+1));
+            if ~isempty(interval_sep_points)
+                fprintf('  该区间内的分离点：');
+                fprintf(' %.4f', interval_sep_points);
+                fprintf('\n');
+            end
+        end
+    end
+    
+    % 检查无穷远区间
+    if ~isempty(all_critical_points)
+        % 左侧无穷远区间
+        test_point = all_critical_points(1) - 1;
+        poles_right = sum(real(sys_poles) > test_point);
+        zeros_right = sum(real(sys_zeros) > test_point);
+        if mod(poles_right - zeros_right, 2) == 1
+            fprintf('区间 (-∞, %.4f] 上有根轨迹\n', all_critical_points(1));
+        end
+        
+        % 右侧无穷远区间
+        test_point = all_critical_points(end) + 1;
+        poles_right = sum(real(sys_poles) > test_point);
+        zeros_right = sum(real(sys_zeros) > test_point);
+        if mod(poles_right - zeros_right, 2) == 1
+            fprintf('区间 [%.4f, +∞) 上有根轨迹\n', all_critical_points(end));
+        end
+    end
+end
+
+%% 3. 绘制渐近线
 fprintf('\n=== 渐近线计算 ===\n');
 
 if n > m
@@ -129,8 +389,8 @@ if n > m
     % 渐近线与实轴的交点（质心）
     sigma_a = (sum(sys_poles) - sum(sys_zeros)) / (n - m);
     
-    % 渐近线角度 - 使用内置zeros函数创建数组
-    asymptote_angles = zeros(1, num_asymptotes);  % 现在不会冲突了
+    % 渐近线角度
+    asymptote_angles = zeros(1, num_asymptotes);
     for i = 1:num_asymptotes
         asymptote_angles(i) = (2*i - 1) * 180 / (n - m);
     end
@@ -164,7 +424,7 @@ else
     fprintf('n ≤ m，无渐近线\n');
 end
 
-%% 3. 计算出射角和入射角
+%% 4. 计算出射角和入射角
 fprintf('\n=== 出射角/入射角计算 ===\n');
 
 angles = struct();
@@ -231,7 +491,7 @@ end
 complex_zeros = sys_zeros(imag(sys_zeros) ~= 0);
 if ~isempty(complex_zeros)
     fprintf('复数零点入射角:\n');
-    angles.arrival = zeros(1, length(complex_zeros));  % 使用内置zeros函数
+    angles.arrival = zeros(1, length(complex_zeros)); 
     
     for i = 1:length(complex_zeros)
         zero = complex_zeros(i);
@@ -298,19 +558,35 @@ end
 if ~isempty(k_critical)
     text(text_x, text_y - 1, '● 虚轴交点', 'FontSize', 10, 'Color', 'magenta', 'FontWeight', 'bold');
 end
+if ~isempty(separation_points)
+    text(text_x, text_y - 1.5, '■ 分离点', 'FontSize', 10, 'Color', 'blue', 'FontWeight', 'bold');
+end
 if n > m
-    text(text_x, text_y - 1.5, '-- 渐近线', 'FontSize', 10, 'Color', 'black', 'FontWeight', 'bold');
+    text(text_x, text_y - 2, '-- 渐近线', 'FontSize', 10, 'Color', 'black', 'FontWeight', 'bold');
 end
 
-% 更新标题显示临界增益信息
-if ~isempty(k_critical)
-    if isscalar(k_critical)
-        title(sprintf('根轨迹图 [临界增益: K_c = %.4f]', k_critical(1)));
+% 更新标题显示临界增益和分离点信息
+title_str = '根轨迹图';
+if ~isempty(k_critical) && ~isempty(separation_points)
+    if isscalar(k_critical) && isscalar(separation_points)
+        title_str = sprintf('根轨迹图 [临界增益: K_c=%.3f, 分离点: s=%.3f]', k_critical(1), separation_points(1));
     else
-        title(sprintf('根轨迹图 [临界增益: K_c = %s]', ...
-              mat2str(k_critical, 4)));
+        title_str = sprintf('根轨迹图 [临界增益: %d个, 分离点: %d个]', length(k_critical), length(separation_points));
+    end
+elseif ~isempty(k_critical)
+    if isscalar(k_critical)
+        title_str = sprintf('根轨迹图 [临界增益: K_c = %.4f]', k_critical(1));
+    else
+        title_str = sprintf('根轨迹图 [临界增益: K_c = %s]', mat2str(k_critical, 4));
+    end
+elseif ~isempty(separation_points)
+    if isscalar(separation_points)
+        title_str = sprintf('根轨迹图 [分离点: s = %.4f]', separation_points(1));
+    else
+        title_str = sprintf('根轨迹图 [分离点: %d个]', length(separation_points));
     end
 end
+title(title_str);
 
 hold off;
 
@@ -319,6 +595,9 @@ fprintf('\n=== 分析总结 ===\n');
 fprintf('系统阶数: %d (极点数: %d, 零点数: %d)\n', n, n, m);
 if ~isempty(k_critical)
     fprintf('临界增益数量: %d\n', length(k_critical));
+end
+if ~isempty(separation_points)
+    fprintf('分离点数量: %d\n', length(separation_points));
 end
 if n > m
     fprintf('渐近线数量: %d\n', num_asymptotes);
