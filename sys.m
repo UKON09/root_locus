@@ -1,4 +1,5 @@
 % 清除工作空间
+clc;
 clear;
 close all;
 
