@@ -4,6 +4,7 @@ function [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys, kin)
 %
 % 输入参数：
 %   sys          - 开环传递函数 (tf 或 zpk 对象)
+%   kin          - 开环传递函数的增益
 %
 % 输出参数：
 %   r          - 根轨迹上的极点位置
