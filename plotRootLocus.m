@@ -1,4 +1,4 @@
-function [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys)
+function [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys, kin)
 % PLOTROOTLOCUS 绘制系统根轨迹图
 %   [r, k, k_critical, asymptotes, angles] = plotRootLocus(sys)
 %
@@ -144,6 +144,7 @@ figure;
 
 % 绘制根轨迹
 rlocus(sys);
+set(findobj(get(gca,'Children'),'LineWidth',0.5),'LineWidth',2); % 加粗根轨迹
 hold on;
 
 % 添加网格和标签
@@ -189,16 +190,17 @@ try
     for i = 1:length(w_solutions)
         w_val = w_solutions(i);
         K_val = -double(subs(real_part, [w, K_sym], [w_val, 0])) / double(subs(diff(real_part, K_sym), w, w_val));
+        K_val = K_val .* kin;
         
         if K_val > 0 % 只考虑正增益
             k_critical = [k_critical, K_val];
             fprintf('虚轴交点: s = ±%.4fj, 临界增益: K = %.4f\n', w_val, K_val);
             
             % 在图上标记交点
-            plot([0, 0], [w_val, -w_val], 'mo', 'MarkerSize', 10, 'LineWidth', 3);
-            text(0.1, w_val, sprintf('K=%.2f', K_val), 'FontSize', 10, 'Color', 'magenta');
+            plot([0, 0], [w_val, -w_val], 'm.', 'MarkerSize', 16, 'LineWidth', 3);
+            text(15, w_val, sprintf('K=%.2f', K_val), 'FontSize', 10, 'Color', 'magenta');
             if w_val > 0
-                text(0.1, -w_val, sprintf('K=%.2f', K_val), 'FontSize', 10, 'Color', 'magenta');
+                text(15, -w_val, sprintf('K=%.2f', K_val), 'FontSize', 10, 'Color', 'magenta');
             end
         end
     end
@@ -281,8 +283,8 @@ if length(numerator_deriv) > 1
                 fprintf('  s = %.4f, K = %.4f\n', s_point, K_value);
                 
                 % 在图上标记分离点
-                plot(s_point, 0, 'bs', 'MarkerSize', 12, 'MarkerFaceColor', 'blue', 'LineWidth', 2);
-                text(s_point, 0.3, sprintf('分离点\nK=%.2f', K_value), ...
+                plot(s_point, 0, 'bs', 'MarkerSize', 8, 'MarkerFaceColor', 'blue', 'LineWidth', 2);
+                text(s_point, -30, sprintf('分离点\nK=%.2f', K_value), ...
                      'FontSize', 9, 'Color', 'blue', 'FontWeight', 'bold', ...
                      'HorizontalAlignment', 'center');
             end
@@ -327,7 +329,7 @@ if ~isempty(separation_points)
 end
 
 % 方法3：使用根轨迹实轴规则验证
-fprintf('\n实轴上根轨迹区段分析：\n');
+fprintf('\n=== 实轴上根轨迹区段分析 ===\n');
 all_critical_points = [real(sys_poles)', real(sys_zeros)'];
 all_critical_points = sort(all_critical_points);
 
@@ -416,8 +418,8 @@ if n > m
         
         % 绘制渐近线
         plot([sigma_a - line_length * cos(angle_rad), x_end], ...
-             [-line_length * sin(angle_rad), y_end], ...
-             'k--', 'LineWidth', 1.5);
+            [-line_length * sin(angle_rad), y_end], ...
+            'Color', [0.5 0.5 0.5], 'LineStyle', '--', 'LineWidth', 1.5);
     end
 else
     asymptotes = struct('center', [], 'angles', [], 'count', 0);
@@ -481,7 +483,7 @@ if ~isempty(complex_poles)
                0, 'g', 'LineWidth', 2, 'MaxHeadSize', 0.3);
         
         % 添加角度标注
-        text(real(pole) + 0.1, imag(pole) + 0.1, ...
+        text(real(pole) + 8, imag(pole), ...
              sprintf('%.0f°', departure_angle), ...
              'FontSize', 9, 'Color', 'green', 'FontWeight', 'bold');
     end
@@ -536,34 +538,23 @@ if ~isempty(complex_zeros)
                0, 'r', 'LineWidth', 2, 'MaxHeadSize', 0.3);
         
         % 添加角度标注
-        text(real(zero) + 0.1, imag(zero) + 0.1, ...
+        text(real(zero) + 8, imag(zero), ...
              sprintf('%.0f°', arrival_angle), ...
              'FontSize', 9, 'Color', 'red', 'FontWeight', 'bold');
     end
 end
 
 %% 添加极零点标记
-h_poles = plot(real(sys_poles), imag(sys_poles), 'rx', 'MarkerSize', 12, 'LineWidth', 2);
+h_poles = plot(real(sys_poles), imag(sys_poles), 'rx', 'MarkerSize', 10, 'LineWidth', 2);
 if ~isempty(sys_zeros)
     h_zeros = plot(real(sys_zeros), imag(sys_zeros), 'ro', 'MarkerSize', 10, 'LineWidth', 2);
 end
 
 % 添加文本说明替代图例，避免与控制系统工具箱冲突
-text_x = min(real(sys_poles)) - 2;
-text_y = max(imag(sys_poles)) + 1;
-text(text_x, text_y, '× 极点', 'FontSize', 10, 'Color', 'red', 'FontWeight', 'bold');
-if ~isempty(sys_zeros)
-    text(text_x, text_y - 0.5, '○ 零点', 'FontSize', 10, 'Color', 'red', 'FontWeight', 'bold');
-end
-if ~isempty(k_critical)
-    text(text_x, text_y - 1, '● 虚轴交点', 'FontSize', 10, 'Color', 'magenta', 'FontWeight', 'bold');
-end
-if ~isempty(separation_points)
-    text(text_x, text_y - 1.5, '■ 分离点', 'FontSize', 10, 'Color', 'blue', 'FontWeight', 'bold');
-end
-if n > m
-    text(text_x, text_y - 2, '-- 渐近线', 'FontSize', 10, 'Color', 'black', 'FontWeight', 'bold');
-end
+text_x = min(real(sys_poles)) - 20;
+text_y = max(imag(sys_poles)) + 50;
+text(text_x, text_y, '× 极点', 'FontSize', 8, 'Color', 'red', 'FontWeight', 'bold');
+text(text_x, text_y - 15, '○ 零点', 'FontSize', 8, 'Color', 'red', 'FontWeight', 'bold');
 
 % 更新标题显示临界增益和分离点信息
 title_str = '根轨迹图';
