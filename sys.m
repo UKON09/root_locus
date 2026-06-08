@@ -29,6 +29,9 @@ G = zpk(sys_zeros,sys_poles,sys_gain);
 % den = [1 24 100 400 0];  % 分母多项式系数
 % G = tf(num, den);
 
+%% 方法三：直接写
+% s = tf('s');
+% G = 1 / (s * (s + 20) * (s^2 + 4*s + 20));
 
 %% ====== 绘制根轨迹（右半平面不能出现零极点） ======
 [r, k, k_crit, asymp, ang] = plotRootLocus(G, kin);
